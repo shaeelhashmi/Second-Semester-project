@@ -179,6 +179,12 @@ class Asteroid {
     }
     void setRandomPosition(RenderWindow& window) {
         asteroid.setPosition(Vector2f(rand() % window.getSize().x - 100, 0));
+           if(asteroid.getPosition().x+30>=window.getSize().x ){
+            asteroid.setPosition(Vector2f(asteroid.getPosition().x-30, 0));
+        }
+        else if(asteroid.getPosition().x-30  <=0){
+            asteroid.setPosition(Vector2f(asteroid.getPosition().x+30, 0));
+        }
     }
     void setRandomSize() {
         size = (rand() % 2) + 1;
