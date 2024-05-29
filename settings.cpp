@@ -149,4 +149,3 @@ void settingsScreen(RenderWindow& window,Sound &sound) {
         window.display();
     }
 }
-
