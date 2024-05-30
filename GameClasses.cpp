@@ -1,592 +1,405 @@
-#include <SFML/Graphics.hpp>
+#include "bossFight.cpp"
 #include <SFML/Audio.hpp>
-#include <ctime>
-#include <fstream>
-#include <cstring>
-#include <string>
-#include <vector>
-#include <algorithm>
-#include <iostream>
+
 using namespace std;
 using namespace sf;
-class Button {
-    public:
-    Button(string t, Vector2f size, int charSize, Color bgColor, Color textColor, float offset = 1)
-        : offset(offset) {
-        text.setString(t);
-        text.setFillColor(textColor);
-        text.setCharacterSize(charSize);
-        button.setSize(size);
-        button.setFillColor(bgColor);
-    }
-    void setFont(Font& font) {
-        text.setFont(font);
-    }
 
-    void setBackColor(Color color) {
-        button.setFillColor(color);
-    }
-    void setTextColor(Color color) {
-        text.setFillColor(color);
-    }
-    void setPosition(Vector2f pos) {
-        button.setPosition(pos);
-        float xPos = pos.x + (button.getLocalBounds().width - text.getLocalBounds().width) / 2;
-        float yPos = pos.y + (button.getLocalBounds().height - text.getLocalBounds().height) / 2;
-        yPos -= offset;
-        text.setPosition(xPos, yPos);
-    }
-    Vector2f getPosition() const {
-        return button.getPosition();
-    }
-    Vector2f getSize() const {
-        return button.getSize();
-    }
-    void drawTo(RenderWindow& window) {
-        window.draw(button);
-        window.draw(text);
-    }
-    bool buttonClicked(RenderWindow& window) {
-        Vector2f mousePos = window.mapPixelToCoords(Mouse::getPosition(window));
+void game(RenderWindow& window, string username) {
+    Spaceship spaceship(window);
+    //This is for playing a sound when the bullet is shot
+    Revive revive(window, "Revive.png");
+    SpeedBoost speedboost(window, "Speed.png");
+    HealthRegen healthregen(window, "hearts.png");
 
-        return button.getGlobalBounds().contains(mousePos);
-    }
-    void leftalign(Vector2f pos, float textOffset) {
-        button.setPosition(pos);
-        float xPos = pos.x + textOffset;
-        float yPos = (pos.y + button.getLocalBounds().height / 2) - (text.getLocalBounds().height / 2);
-        text.setPosition(xPos, yPos);
-    }
-    Text getText() {
-        return text;
-    }
-    private:
-    RectangleShape button;
-    Text text;
-    float offset;
-};
-class Picture {
-    public:
-    Picture(string filePath) {
-        texture.loadFromFile(filePath);
-        sprite.setTexture(texture);
-    }
-    void SetTexture(string filePath) {
-        texture.loadFromFile(filePath);
-        sprite.setTexture(texture);
-    }
-    void setScale(sf::Vector2f scale) {
-        scale.x = std::max(scale.x, 0.1f); // Minimum scale to avoid division by zero
-        scale.y = std::max(scale.y, 0.1f);
-        // Calculate aspect ratio
-        sf::Vector2f Aspectratio(scale.x / texture.getSize().x, scale.y / texture.getSize().y);
+    Bullets bullet(window, "bullets.png");
+    Picture hearts[5] = { Picture("hearts.png"), Picture("hearts.png"), Picture("hearts.png"), Picture("hearts.png"), Picture("hearts.png") };
 
-        // Set scale of sprite
-        sprite.setScale(Aspectratio);
-    }
-    void setPosition(sf::Vector2f position) {
-        sprite.setPosition(position);
-    }
-    void drawTo(sf::RenderWindow& window) {
-        window.draw(sprite);
-    }
-    Vector2f getPosition() {
-        return sprite.getPosition();
-    }
-    Vector2f getSize() {
-        return sprite.getScale();
-    }
-    Vector2f getsizeText() {
-        return Vector2f(texture.getSize().x, texture.getSize().y);
-    }
-    void move(double x, double y) {
-        sprite.move(x, y);
-    }
-    FloatRect getGlobalBounds() {
-        return sprite.getGlobalBounds();
-    }
-    void rotate(float angle) {
-        sprite.rotate(angle);
-    }
+    int levels = 1;
+    int shootedAsteroids = 0;
+    string settings[3];
+    Clock clock;
+    Asteroid as(window, "Asteroid.png", spaceship.getSize().x);
+    SpecialAsteroid specialAst(window, "SpecialAsteroid.png");
+    // The clock for the multiplier to end
+    Clock endMultiplier;
+    Clock asteroidClock;
+    Boss b1(window, "Spaceship.png");
+    vector<Bullets> bullets;
+    vector<Asteroid> asteroids;
+    // This array will store the exploded array
+    vector<Asteroid> explodedAsteroids;
+    // This vector will store the time for each exploded asteroid
+    vector<Clock> explodedAsteroidsTime;
+    // This will be increased for every asteroid destroyed
+    vector<SpecialAsteroid> SpecialAste;
 
-    private:
-    sf::Texture texture;
-    sf::Sprite sprite;
-};
+    Texture gameBg;
+    Sprite gameSP;
+    gameBg.loadFromFile("SpaceBg.png");
+    gameSP.setTexture(gameBg);
 
-class Spaceship {
-    Picture spaceship;
-
-    public:
-    Spaceship(RenderWindow& window) : spaceship("Spaceship.png") {
-        spaceship.setScale(Vector2f(window.getSize().x * 0.082, window.getSize().y * 0.134));
-        spaceship.setPosition(Vector2f((window.getSize().x / 2) - 100, window.getSize().y - 115));
-    }
-    void setPosition(Vector2f position) {
-        spaceship.setPosition(position);
-    }
-    bool checkleft(double move) {
-        return spaceship.getPosition().x - move > 0;
-    }
-    bool checkright(RenderWindow& window, double move) {
-        return spaceship.getPosition().x + move < window.getSize().x - 100;
-    }
-    bool checkUp(double move, RenderWindow& window) {
-        return spaceship.getPosition().y - move > window.getSize().y / 2;
-    }
-    bool checkdown(RenderWindow& window, double move) {
-        return spaceship.getPosition().y + move < window.getSize().y - 111;
-    }
-    void drawTo(RenderWindow& window) {
-        spaceship.drawTo(window);
-    }
-    Vector2f getPosition() {
-        return spaceship.getPosition();
-    }
-    Vector2f getSize() {
-        return spaceship.getSize();
-    }
-    void move(double x, double y) {
-        spaceship.move(x, y);
-    }
-    FloatRect getGlobalBounds() {
-        return spaceship.getGlobalBounds();
-    }
-
-    void SetTexture(string filePath) {
-        spaceship.SetTexture(filePath);
-        spaceship.setScale(Vector2f(50, 50));
-    }
-};
-
-class Asteroid {
-    Picture asteroid;
-    int size;
-    int health;
-    int hits;
-    public:
-    static bool generated;
-    Asteroid(RenderWindow& window, string Filepath, double Corners) : asteroid(Filepath) {
-        if (generated) {
-            srand(time(nullptr));
-            generated = false;
-        }
-        size = (rand() % 2) + 1;
-        health = size;
-        hits=0;
-        asteroid.setScale(Vector2f(50 * size, 50 * size));
-        asteroid.setPosition(Vector2f(rand() % window.getSize().x - 100, 0));
-        if(asteroid.getPosition().x+Corners>window.getSize().x ){
-            asteroid.setPosition(Vector2f(window.getSize().x/2, 0));
-        }
-        else if(asteroid.getPosition().x-Corners  < window.getSize().x){
-            asteroid.setPosition(Vector2f(window.getSize().x/2, 0));
-        }
-    }
-    void setRandomPosition(RenderWindow& window) {
-        asteroid.setPosition(Vector2f(rand() % window.getSize().x - 100, 0));
-           if(asteroid.getPosition().x+30>=window.getSize().x ){
-            asteroid.setPosition(Vector2f(asteroid.getPosition().x-30, 0));
-        }
-        else if(asteroid.getPosition().x-30  <=0){
-            asteroid.setPosition(Vector2f(asteroid.getPosition().x+30, 0));
-        }
-    }
-    void setRandomSize() {
-        size = (rand() % 2) + 1;
-        health = size;
-        asteroid.setScale(Vector2f(50 * size, 50 * size));
-    }
-    void SetTexture(string filePath) {
-        asteroid.SetTexture(filePath);
-    }
-    void move(RenderWindow& window, int level, string difficulty) {
-
-        double speed = window.getSize().y * 0.005 + (level * 0.008);
-        if (difficulty == "hard") {
-            speed = window.getSize().y * 0.005 + (level * 0.008);
-        }
-        else if (difficulty == "medium") {
-            speed = window.getSize().y * 0.003 + (level * 0.007);
-        }
-        else {
-            speed = window.getSize().y * 0.001 + (level * 0.006);
-        }
-        asteroid.move(0, speed);
-    }
-    void incrementHits() {
-        ++hits;
-    }
-    bool asteroidDestroyed() {
-        return hits >= health;
-    }
-    void drawTo(RenderWindow& window) {
-        asteroid.drawTo(window);
-    }
-    Vector2f getPosition() {
-        return asteroid.getPosition();
-    }
-    Vector2f getSize() {
-        return asteroid.getSize();
-    }
-    FloatRect getGlobalBounds() {
-        return asteroid.getGlobalBounds();
-    }
-    int getSizeValue() {
-        return size;
-    }
-};
-bool Asteroid::generated = true;
-class Bullets {
-    Picture bullet;
-
-    public:
-    Bullets(RenderWindow& window, string Texture) : bullet(Texture) {
-        bullet.setScale(Vector2f(window.getSize().x * 0.01239, window.getSize().y * 0.04103));
-    }
-    void move(RenderWindow& window) {
-        float speed = 1.0f;
-        bullet.move(0, -speed);
-    }
-    void drawTo(RenderWindow& window) {
-        bullet.drawTo(window);
-    }
-    Vector2f getPosition() {
-        return bullet.getPosition();
-    }
-    Vector2f getSize() {
-        return bullet.getSize();
-    }
-    void move(double x, double y) {
-        bullet.move(x, y);
-    }
-    FloatRect getGlobalBounds() {
-        return bullet.getGlobalBounds();
-    }
-    void SetPosition(float x, float y) {
-        bullet.setPosition(Vector2f(x, y));
-    }
-};
-
-class Boss {
-    Picture boss;
-    Clock changeMovement;
-    int hits;
-    bool generated;
-    public:
-    Boss(RenderWindow& window, string bossText) : boss(bossText) {
-        boss.setScale(Vector2f(window.getSize().x * 0.082, window.getSize().y * 0.134));
-        boss.setPosition(Vector2f((window.getSize().x / 2) - 100, 0));
-        hits = 0;
-        generated = true;
-    }
-
-    void script(RenderWindow& window, Spaceship& spaceship, int TeleportationTime) {
-        if (generated) {
-            srand(time(nullptr));
-            generated = false;
-        }
-        if (changeMovement.getElapsedTime().asSeconds() > TeleportationTime) {
-            float positionX = spaceship.getPosition().x;
-            float positionY = (rand() % window.getSize().y / 4) + 100;
-            boss.setPosition(Vector2f(positionX, positionY));
-            changeMovement.restart();
-        }
-        drawTo(window);
-
-    }
-    void incrementHits() {
-        hits++;
-    }
-    void drawTo(RenderWindow& window) {
-        boss.drawTo(window);
-    }
-    Vector2f getPosition() {
-        return boss.getPosition();
-    }
-    FloatRect getGlobalBounds() {
-        return boss.getGlobalBounds();
-    }
-    void Follow(Spaceship& spaceship, double movement) {
-        int spaceshipPosX = spaceship.getPosition().x;
-        int bossPosX = boss.getPosition().x;
-        if (spaceshipPosX > bossPosX) {
-            boss.move(movement, 0);
-        }
-        else if (spaceshipPosX < bossPosX) {
-            boss.move(-movement, 0);
-        }
-    }
-    int getHits() {
-        return hits;
-    }
-};
-class AirStrikeMinion {
-    Picture minion;
-    public:
-    AirStrikeMinion(RenderWindow& window, string minionText) :minion(minionText) {
-        minion.setScale(Vector2f(window.getSize().x * 0.082, window.getSize().y * 0.009));
-        minion.setPosition(Vector2f(window.getSize().x - 100, 100));
-    }
-    void setStartingPosition(RenderWindow& window) {
-        minion.setPosition(Vector2f(window.getSize().x - 100, 100));
-    }
-    void script(RenderWindow& window) {
-        minion.move(-4, 0);
-        drawTo(window);
-    }
-    void drawTo(RenderWindow& window) {
-        minion.drawTo(window);
-    }
-    Vector2f getPosition() {
-        return minion.getPosition();
-    }
-    void setPosition(Vector2f position) {
-        minion.setPosition(position);
-    }
-};
-
-class SpecialAsteroid {
-    Picture specialast;
-
-    public:
-    SpecialAsteroid(RenderWindow& window, string specialtex) : specialast(specialtex) {
-        specialast.setScale(Vector2f(50, 50));
-        srand(time(nullptr));
-        specialast.setPosition(Vector2f(rand() % window.getSize().x - 100, 0));
-    }
-    void setRandomPosition(RenderWindow& window) {
-        specialast.setPosition(Vector2f(rand() % window.getSize().x - 100, 0));
-    }
-    void move(RenderWindow& window) {
-        float speed = 3.5f;
-        specialast.move(0, speed);
-    }
-    void drawTo(RenderWindow& window) {
-        specialast.drawTo(window);
-    }
-    Vector2f getPosition() {
-        return specialast.getPosition();
-    }
-    Vector2f getSize() {
-        return specialast.getSize();
-    }
-    FloatRect getGlobalBounds() {
-        return specialast.getGlobalBounds();
-    }
-};
-
-class Revive  {
-    Picture revive;
-    int revives;
-    Clock PowerUpTimer;
-public:
-    Revive(RenderWindow& window, string reviveText) : revive(reviveText) {
-        revive.setScale(Vector2f(50,50));
-        revive.setPosition(Vector2f(rand() % (window.getSize().x - 100), 0));
-        revives=0;
-    }
-    void increaseRevives() {
-        revives++;
-    }
-    void drawTo(RenderWindow& window)  {
-        revive.drawTo(window);
-    }
-
-    void move(double movement)  {
-        revive.move(0, movement * 2);
-    }
-    FloatRect getGlobalBounds()  {
-        return revive.getGlobalBounds();
-    }
-
-    int timer = rand() % 120;
-
-    void script(RenderWindow& window,Spaceship& spaceship)  {
-        if(PowerUpTimer.getElapsedTime().asSeconds()> timer){
-            
-            revive.move(0, 2);
-            revive.drawTo(window);
-            if(spaceship.getGlobalBounds().intersects(revive.getGlobalBounds())){
-                increaseRevives();
-                revive.setPosition(Vector2f(rand() % (window.getSize().x - 100), 0));
-                PowerUpTimer.restart();        
-            }
-            else if(revive.getPosition().y>window.getSize().y){
-                PowerUpTimer.restart();
-                 revive.setPosition(Vector2f(rand() % (window.getSize().x - 100), 0));
-            }
-
-        }
-        
-    }
-    void SetHealth(int &hearts) {
-        if(revives>0){
-            hearts=5;
-            revives--;
-        }
-    }
-    void incrementRevives() {
-        revives++;
-    }
-    void resetTimer(RenderWindow& window) {
-        PowerUpTimer.restart();
-        revive.setPosition(Vector2f(rand() % (window.getSize().x - 100), 0));
-    }
-
-    int getRevives() {
-        return revives;
-    }
-};
-
-
-class SpeedBoost {
-    Picture speedboost;
-    Clock PowerUpTimer;
-   
-    public:
-    SpeedBoost(RenderWindow& window, string speedboostText) : speedboost(speedboostText) {
-        speedboost.setScale(Vector2f(50, 50));
-        speedboost.setPosition(Vector2f(rand() % (window.getSize().x - 100), 0));
-    }
-    void drawTo(RenderWindow& window) {
-        speedboost.drawTo(window);
-    }
-
-    void move(double movement) {
-        speedboost.move(0, movement * 2);
-    }
-
-    FloatRect getGlobalBounds() {
-        return speedboost.getGlobalBounds();
-    }
-    
-    int timer = rand() % 40;
-    
-    void script(RenderWindow& window, Spaceship& spaceship,double &movement) {
-        if (PowerUpTimer.getElapsedTime().asSeconds() > timer) {
-            speedboost.move(0, 2);
-            speedboost.drawTo(window);
-            if (spaceship.getGlobalBounds().intersects(speedboost.getGlobalBounds())) {
-                movement *= 3.0;
-                PowerUpTimer.restart();
-                speedboost.setPosition(Vector2f(rand() % (window.getSize().x - 100), 0));
-            }
-            else if (speedboost.getPosition().y > window.getSize().y) {
-                PowerUpTimer.restart();
-                speedboost.setPosition(Vector2f(rand() % (window.getSize().x - 100), 0));
+    bool changelevel = false;
+    int heart = 5;
+    int multiplier = 1;
+    bool a = true;
+    double movement = window.getSize().x * window.getSize().y * 0.0000039 * 3;
+    int score = 0;
+    int highScore = 0;
+    vector<pair<int, string>> highScores; // Pair to store high scores with usernames
+    ifstream settingsFile("settings.txt");
+    ifstream HighScoreInput("highscore.txt");
+    if (HighScoreInput.is_open()) {
+        string line;
+        while (getline(HighScoreInput, line)) {
+            size_t pos = line.find(' ');
+            if (pos != string::npos) {
+                string user = line.substr(0, pos);
+                int userScore = stoi(line.substr(pos + 1));
+                highScores.push_back(make_pair(userScore, user));
             }
         }
-    }
-
-    void Timeout(double &movement) {
-            if (PowerUpTimer.getElapsedTime().asSeconds() > 10) {
-                movement = 15.0;
-            }
-    }
-};
-  
-class HealthRegen {
-    Picture healthregen;
-    Clock PowerUpTimer;
-    public:
-    HealthRegen(RenderWindow& window, string healthregenText) : healthregen(healthregenText) {
-        healthregen.setScale(Vector2f(50, 50));
-        healthregen.setPosition(Vector2f(rand() % (window.getSize().x - 100), 0));
-    }
-    void drawTo(RenderWindow& window) {
-        healthregen.drawTo(window);
-    }
-
-    void move(double movement) {
-        healthregen.move(0, movement * 2);
-    }
-
-    FloatRect getGlobalBounds() {
-        return healthregen.getGlobalBounds();
-    }
-    int timer = rand() % 60;
-    void script(RenderWindow& window, Spaceship& spaceship, int &hearts) {
-        if (PowerUpTimer.getElapsedTime().asSeconds() > timer) {
-            healthregen.move(0, 2);
-            healthregen.drawTo(window);
-            if (spaceship.getGlobalBounds().intersects(healthregen.getGlobalBounds())) {
-                if(hearts<3)
-                {
-                hearts += 2;
-                }
-                else
-                {
-                    hearts=5;
-                }
-                PowerUpTimer.restart();
-                healthregen.setPosition(Vector2f(rand() % (window.getSize().x - 100), 0));
-            }
-            else if (healthregen.getPosition().y > window.getSize().y) {
-                PowerUpTimer.restart();
-                healthregen.setPosition(Vector2f(rand() % (window.getSize().x - 100), 0));
-            }
+        HighScoreInput.close();
+        // Sort high scores in descending order
+        sort(highScores.rbegin(), highScores.rend());
+        if (!highScores.empty()) {
+            highScore = highScores[0].first;
         }
     }
-};
-
-bool GameOver(RenderWindow& window,int score) {
-    Button GoTomain("MAIN MENU", Vector2f(300, 80), 24, Color::Transparent, Color::White);
-    Button PlayAgain("PLAY AGAIN", Vector2f(300, 80), 24, Color::Transparent, Color::White);
-    Text GameOver;
-
-     Texture GO;
-    if (!GO.loadFromFile("GameO.png")) {
-        window.close();
+    else {
+        cout << "File is not open" << endl;
     }
-    Sprite GameO;
-    GameO.setTexture(GO);
+    if (settingsFile.is_open()) {
+        string line;
+        int i = 0;
+        while (getline(settingsFile, line)) {
+            settings[i++] = line;
+        }
+    }
+    settingsFile.close();
+    double asteroidTimer = 3;
+    if (settings[1] == "hard") {
+        asteroidTimer = 2.5;
+
+    }
+    else if (settings[1] == "medium") {
+        asteroidTimer = 3;
+
+    }
+    else if (settings[1] == "easy") {
+        asteroidTimer = 3.5;
+
+    }
+    SoundBuffer GameSoundBuffer;
+    SoundBuffer GameOverSoundBuffer;
+    SoundBuffer bulletSoundbuffer;
+    SoundBuffer asteroidSoundbuffer;
+    SoundBuffer HealthLossSoundBuffer;
+    Sound asteroidSound;
+    Sound bulletSound;
+    Sound HealthLossSound;
+    Sound gameSound;
+    Sound gameOverSound;
+    if(settings[0]=="0")
+    {
+    bulletSoundbuffer.loadFromFile("audios/NoSound.wav");
+    asteroidSoundbuffer.loadFromFile("audios/NoSound.wav");
+    HealthLossSoundBuffer.loadFromFile("audios/NoSound.wav");
+    GameSoundBuffer.loadFromFile("audios/NoSound.wav");
+    GameOverSoundBuffer.loadFromFile("audios/NoSound.wav");
+    bulletSound.setBuffer(bulletSoundbuffer);
+    asteroidSound.setBuffer(asteroidSoundbuffer);
+    HealthLossSound.setBuffer(HealthLossSoundBuffer);
+    gameSound.setBuffer(GameSoundBuffer);
+    gameOverSound.setBuffer(GameOverSoundBuffer);
+    }
+    else
+    {
+    bulletSoundbuffer.loadFromFile("audios/BulletShoot.wav");
+    //This is for playing a sound when the asteroid is destroyed
+    asteroidSoundbuffer.loadFromFile("audios/AsteroidExplosion.wav");
+    HealthLossSoundBuffer.loadFromFile("audios/HealthLoss.wav");
+    GameSoundBuffer.loadFromFile("audios/GameSound.wav");
+    GameOverSoundBuffer.loadFromFile("audios/GameOver.wav");
+    bulletSound.setBuffer(bulletSoundbuffer);
+    asteroidSound.setBuffer(asteroidSoundbuffer);
+    HealthLossSound.setBuffer(HealthLossSoundBuffer);
+    gameSound.setBuffer(GameSoundBuffer);
+    gameOverSound.setBuffer(GameOverSoundBuffer);
+    }
 
     Font font;
-    Font font_f;
-
-    if (!font_f.loadFromFile("Thorletto.otf")) {
-        window.close();
+    if (!font.loadFromFile("Valorant.ttf")) {
+        cout << "Error loading font" << endl;
     }
+    Text scoretxt, highscoretxt, levelsTxt, Multiplier,Revive;
+    scoretxt.setFont(font);
+    scoretxt.setCharacterSize(15);
+    scoretxt.setFillColor(Color::White);
+    scoretxt.setPosition(window.getSize().x - 150, 10);
 
-    if (!font.loadFromFile("BuckBoard.ttf")) {
-        window.close();
+    highscoretxt.setFont(font);
+    highscoretxt.setCharacterSize(15);
+    highscoretxt.setFillColor(Color::White);
+    highscoretxt.setPosition(window.getSize().x - 150, 40);
+
+    levelsTxt.setFont(font);
+    levelsTxt.setCharacterSize(15);
+    levelsTxt.setFillColor(Color::White);
+    levelsTxt.setPosition(window.getSize().x - 150, 80);
+
+    Multiplier.setFont(font);
+    Multiplier.setCharacterSize(15);
+    Multiplier.setFillColor(Color::White);
+    Multiplier.setPosition(window.getSize().x - 150, 120);
+
+    Revive.setFont(font);
+    Revive.setCharacterSize(15);
+    Revive.setFillColor(Color::White);
+    Revive.setPosition(window.getSize().x - 150, 160);
+
+    for (int i = 0; i < 5; i++) {
+        hearts[i].setScale(Vector2f(40, 40));
     }
-    GameOver = Text("Game Over", font_f, 55);
-    Text Score = Text("Score: "+to_string(score), font, 20);
-    GameOver.setPosition(Vector2f(500,325));
-    GoTomain.setFont(font);
-    PlayAgain.setFont(font);
-    Score.setPosition((window.getSize().x / 2.0) - 60, (window.getSize().y / 2.0));
-    GoTomain.setPosition(Vector2f((window.getSize().x / 2.0) - PlayAgain.getSize().x - 5, window.getSize().y / 2 + 100));
-    PlayAgain.setPosition(Vector2f((window.getSize().x / 2.0) + 5, window.getSize().y / 2 + 100));
-    while (window.isOpen()) {
-        window.clear();
-        
-        window.draw(GameO);
-        GoTomain.drawTo(window);
-        PlayAgain.drawTo((window));
-       
-        Event event;
-        while(window.pollEvent(event))
+    for (int i = 0; i < 5; i++) {
+        static int pos = 10;
+        hearts[i].setPosition(Vector2f(pos, 20));
+        pos += 50;
+    }
+    gameSound.play();
+    Clock GameSoundTimer;
+window.setFramerateLimit(stoi(settings[2]));
+    while (window.isOpen()) { 
+            
+        if(GameSoundTimer.getElapsedTime().asSeconds()>gameSound.getBuffer()->getDuration().asSeconds())
         {
-            if(event.type==Event::Closed)
-            {
+            gameSound.play();
+            GameSoundTimer.restart();
+        }
+        if (score > highScore) {
+            highScore = score;
+        }
+        // These conditions will start the boss levels
+        if (levels == 5) {
+            changelevel = true;
+            if (asteroids.size() == 0) {
+                level1Boss(window, levels, spaceship, bullets, heart, score, highScore, hearts, scoretxt, highscoretxt, levelsTxt, bullet, clock, movement,settings,HealthLossSound,gameSound,revive);
+                changelevel = false;
+            }
+        }
+        else if (levels == 10) {
+            changelevel = true;
+            if (asteroids.size() == 0) {
+                level2Boss(window, levels, spaceship, bullets, heart, score, highScore, hearts, scoretxt, highscoretxt, levelsTxt, bullet, clock, movement,settings,HealthLossSound,gameSound,revive);
+                changelevel = false;
+            }
+        }
+        else if (levels == 15) {
+            changelevel = true;
+            if (asteroids.size() == 0) {
+                level3Boss(window, levels, spaceship, bullets, heart, score, highScore, hearts, scoretxt, highscoretxt, levelsTxt, bullet, clock, movement, as, asteroids, explodedAsteroids, explodedAsteroidsTime, asteroidClock, multiplier, endMultiplier, Multiplier, settings,HealthLossSound,gameSound,revive);
+                changelevel = false;
+            }
+        }
+        else if (levels == 20) {
+            changelevel = true;
+            if (asteroids.size() == 0) {
+                level4Boss(window, levels, spaceship, bullets, heart, score, highScore, hearts, scoretxt, highscoretxt, levelsTxt, bullet, clock, movement, as, asteroids, explodedAsteroids, explodedAsteroidsTime, asteroidClock, multiplier, endMultiplier, Multiplier, settings,HealthLossSound,gameSound,revive);
+                changelevel = false;
+            }
+        }
+        
+        Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == Event::Closed) {
                 window.close();
             }
-            if (event.type == Event::MouseButtonPressed) {
-                if (GoTomain.buttonClicked(window)) {
-                    return true;
-                }
-                if (PlayAgain.buttonClicked(window)) {
-                    return false;
+        }
+        if (event.key.code == Keyboard::Space && (clock.getElapsedTime().asSeconds() > 0.5 || a)) {
+            bulletSound.play();
+            bullet.SetPosition((spaceship.getPosition().x) + 50, spaceship.getPosition().y - 10);
+            bullets.push_back(bullet);
+            bullet.drawTo(window);
+            window.display();
+            clock.restart();
+            a = false;
+            event.key.code = Keyboard::Unknown;
+        }
+        if ((Keyboard::isKeyPressed(Keyboard::A) || Keyboard::isKeyPressed(Keyboard::Left)) && spaceship.checkleft(movement)) {
+            spaceship.move(-1 * movement, 0);
+        }
+        if ((Keyboard::isKeyPressed(Keyboard::D) || Keyboard::isKeyPressed(Keyboard::Right)) && spaceship.checkright(window, movement)) {
+            spaceship.move(movement, 0);
+        }
+        if ((Keyboard::isKeyPressed(Keyboard::W) || Keyboard::isKeyPressed(Keyboard::Up)) && spaceship.checkUp(movement, window)) {
+            spaceship.move(0, -1 * movement);
+        }
+        if ((Keyboard::isKeyPressed(Keyboard::S) || Keyboard::isKeyPressed(Keyboard::Down)) && spaceship.checkdown(window, movement)) {
+            spaceship.move(0, movement);
+        }
+        // This condition will check if the multiplier has ended
+        if (endMultiplier.getElapsedTime().asSeconds() > 3) {
+            multiplier = 1;
+        }
+        window.clear();
+        window.draw(gameSP);
+        for (int i = 0; i < bullets.size(); i++) {
+            if (bullets[i].getPosition().y < 0) {
+                bullets.erase(bullets.begin() + i);
+            }
+            else {
+                bullets[i].move(0, window.getSize().y * -0.02);
+                bullets[i].drawTo(window);
+            }
+        }
+        for (int i = 0; i < asteroids.size(); i++) {
+            asteroids[i].SetTexture("Asteroid.png");
+            asteroids[i].move(window, levels, settings[1]);
+            asteroids[i].drawTo(window);
+            if (spaceship.getGlobalBounds().intersects(asteroids[i].getGlobalBounds())) {
+                HealthLossSound.play();
+                heart--;
+                asteroids.erase(asteroids.begin() + i);
+            }
+            if (asteroids[i].getPosition().y > window.getSize().y) {
+                asteroids.erase(asteroids.begin() + i);
+            }
+            for (int j = 0; j < bullets.size(); j++) {
+                if (asteroids[i].getGlobalBounds().intersects(bullets[j].getGlobalBounds())) {
+                    asteroids[i].incrementHits();
+                    bullets.erase(bullets.begin() + j);
+                    if(asteroids[i].asteroidDestroyed())
+                    {
+                        Clock c;
+                     asteroidSound.play();
+                    asteroids[i].SetTexture("AsteroidDestructions.png");
+                    explodedAsteroids.push_back(asteroids[i]);
+                    explodedAsteroidsTime.push_back(c);
+                    int asteroidSize = asteroids[i].getSizeValue();
+                    if (asteroidSize == 1) {
+                        score += 5 * multiplier;
+                    }
+                    else if (asteroidSize == 2) {
+                        score += 10 * multiplier;
+                    }
+                    asteroids.erase(asteroids.begin() + i);
+                    
+                    multiplier++;
+                    endMultiplier.restart();
+                    }
+                    
                 }
             }
         }
-        window.draw(GameOver);
-        window.draw(Score);
-        
-        window.display();
+        if (shootedAsteroids >= 5+(0.5*levels)) {
+            levels++;
+            shootedAsteroids = 0;
+            if (levels % 3 == 0) {
+                SpecialAste.push_back(specialAst);
+            }
+        }
+        if (asteroidClock.getElapsedTime().asSeconds() > asteroidTimer - (levels * 0.09)) {
+            if (!changelevel) {
+                as.setRandomPosition(window);
+                as.setRandomSize();
+                shootedAsteroids++;
+                asteroids.push_back(as);
+                asteroidClock.restart();
+            }
+        }
+        for (int i = 0; i < explodedAsteroids.size(); i++) {
+            if (explodedAsteroidsTime[i].getElapsedTime().asSeconds() > 1) {
+                explodedAsteroids.erase(explodedAsteroids.begin() + i);
+                explodedAsteroidsTime.erase(explodedAsteroidsTime.begin() + i);
+            }
+            else {
+                explodedAsteroids[i].SetTexture("AsteroidDestructions.png");
+                explodedAsteroids[i].drawTo(window);
+            }
+        }
+
+        for (int i = 0; i < SpecialAste.size(); i++) {
+            SpecialAste[i].move(window);
+            SpecialAste[i].drawTo(window);
+            if (spaceship.getGlobalBounds().intersects(SpecialAste[i].getGlobalBounds())) {
+                heart = 0;
+                SpecialAste.erase(SpecialAste.begin() + i);
+            }
+
+            for (int j = 0; j < bullets.size(); j++) {
+                if (bullets[j].getGlobalBounds().intersects(SpecialAste[i].getGlobalBounds())) {
+                    bullets.erase(bullets.begin() + j);
+                    break;
+                }
+            }
+
+            if (SpecialAste[i].getPosition().y > window.getSize().y) {
+                SpecialAste.erase(SpecialAste.begin() + i);
+            }
+        }
+
+        spaceship.drawTo(window);
+        for (int i = 0; i < heart; i++) {
+            hearts[i].drawTo(window);
+        }
+        // Ending the game
+        if (heart <= 0) {
+            revive.SetHealth(heart);
+            if(heart==5)
+            {
+                continue;
+            }
+            gameSound.stop();
+            gameOverSound.play();
+            bool quit=GameOver(window, score);
+            // Update high scores
+            highScores.push_back(make_pair(score, username));
+            sort(highScores.rbegin(), highScores.rend());
+            if (highScores.size() > 5) {
+                highScores.resize(5); // Keep only top 5 scores
+            }
+
+            ofstream HighScoreOutput("highscore.txt");
+            for (const auto& entry : highScores) {
+                HighScoreOutput << entry.second << " " << entry.first << endl;
+            }
+            HighScoreOutput.close();
+            if(quit){
+                return;
+            }
+            else{
+                score = 0;
+                levels = 1;
+                heart = 5;
+                multiplier = 1;
+                endMultiplier.restart();
+                spaceship.setPosition(Vector2f(window.getSize().x / 2, window.getSize().y - 100));
+                for (int i = 0; i < 5; i++) {
+                    hearts[i].setPosition(Vector2f(10 + (i * 50), 20));
+                }
+                asteroids.erase(asteroids.begin(), asteroids.end());
+                bullets.erase(bullets.begin(), bullets.end());
+                revive.resetTimer(window);
+        }
+       
     }
-   return true;
+    speedboost.script(window,spaceship,movement);
+    speedboost.Timeout(movement);
+    
+    healthregen.script(window,spaceship,heart);
+    revive.script(window,spaceship);
+
+     Revive.setString("Revive: "+to_string(revive.getRevives()));
+     scoretxt.setString("Score: " + to_string(score));
+        highscoretxt.setString("High Score: " + to_string(highScore));
+        levelsTxt.setString("Level: " + to_string(levels));
+        Multiplier.setString("Multiplier: " + to_string(multiplier));
+        
+
+        window.draw(scoretxt);
+        window.draw(highscoretxt);
+        window.draw(levelsTxt);
+        window.draw(Multiplier);
+         window.draw(Revive);
+        window.display();
+}
 }
