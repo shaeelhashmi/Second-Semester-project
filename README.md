@@ -35,15 +35,27 @@ This is a space shooter game made using the C++ framework SFML, implementing the
 ### Prerequistes:
 Make sure SFML is installed and linked on your compiler.
 ### Installation:
-* You can install the zip file of the project from the repo  at [repo](https://github.com/shaeelhashmi/SpaceInvaders)
-* If you have git installed type git clone https://github.com/shaeelhashmi/SpaceInvaders to install the game on your pc, run cd SpaceInvaders after installation.
+* You can install the zip file of the project from the repo   [here](https://github.com/shaeelhashmi/SpaceInvaders)
+* If you have git installed type
+```
+git clone https://github.com/shaeelhashmi/SpaceInvaders
+```
+run 
+```
+cd SpaceInvaders
+```
 ### Execution:
 * Execute the mainmenu.cpp file.
 * If you are using any linux distribution follow these steps:
    * Go the project directory.
-   * In the terminal right the following commands:
-       * g++ mainmenu.cpp -o myprog -lsfml-system -lsfml-graphics -lsfml-window -lsfml-audio.
-       * ./myprog
+   * In the terminal write the following commands:
+```
+g++ mainmenu.cpp -o myprog -lsfml-system -lsfml-graphics -lsfml-window -lsfml-audio.
+```
+then
+```
+./myprog
+```
 * Play the game and enjoy.     
        
                  
